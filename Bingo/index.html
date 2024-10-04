@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bingo Game</title>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js"></script>
+  <script type="module" src="main.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 180px;
+      background-image: url('assets/background2.png');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+
+    #game-container {
+      width: 800px;
+      height: 600px;
+      margin: 0 auto;
+    }
+
+    #game-container canvas {
+      border-radius: 15px; 
+      border: 2px solid #ffffff;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); 
+    }
+.SpinButton {
+  background-color: #ffcc00;
+  color: #000;
+  border-radius: 5px;
+  padding: 10px;
+  cursor: pointer;
+}
+
+
+  </style>
+</head>
+<body>
+  <div id="game-container"></div>
+</body>
+</html>
