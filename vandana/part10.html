@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Barbie's Cosmic Star Adventure</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js"></script>
+    <style type="text/css">
+        body {
+            margin: 0;
+            background-color: #fce4ec; /* Light pink background */
+        }
+        h1, p {
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            color: #ff69b4; /* Barbie pink */
+            text-align: center;
+        }
+        #playButton {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            background-color: #ff69b4;
+            padding: 10px 20px;
+            border: none;
+            color: white;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<button id="playButton">Play Game</button>
+
+<script type="text/javascript">
+// Game configuration
+var config = {
+    type: Phaser.AUTO,
+    width: 1200,
+    height: 1000,
+    physics: {
+        default: 'arcade',
+        arcade: {
+            gravity: { y: 0 }, // No gravity for free movement
+            debug: false // Turn off debug mode to remove any arrows or extra lines
+        }
+    },
+    scene: {
+        preload: preload,
+        create: create,
+        update: update
+    }
+};
+
+var player, stars, obstacles, diamonds, powerUps, shadowa, prince, cursors;
+var score = 0, scoreText, gameOverText, winText, level = 1, levelText, levelUpText;
+var timerText, levelTime = 30, timerEvent, timeLeft;
+var collectSound, powerUpSound, diamondSound, shadowaSound, victorySound;
+var bombSpeed = -100;
+var lives = 1, livesText;
+var gameStarted = false, finalStage = false;
+var playerText, currentPlayer = 1, player1Score = 0, player2Score = 0;
+var backgrounds = ['background1', 'background2', 'background3', 'finalStage'];
+var background;
+var shadowaDefeated = false;
+
+var game = new Phaser.Game(config);
+
+function preload() {
+    // Load game assets
+    this.load.image('background1', 'assets/Barbie.png');
+    this.load.image('background2', 'assets/NextL.jpg');
+    this.load.image('background3', 'assets/NextL.jpg');
+    this.load.image('finalStage', 'assets/FinalS.jpg');
+    this.load.image('player', 'assets/BB1.png');
+    this.load.image('star', 'assets/Bstar.png');
+    this.load.image('diamond', 'assets/Diamond.png');
+    this.load.image('barbieBomb', 'assets/Bbomb1.png');
+    this.load.image('heart', 'assets/CH.png');
+    this.load.image('shadowa', 'assets/G1.jpg'); // Shadowa (Final Boss)
+    this.load.image('prince', 'assets/Prince.png'); // Prince of Starlight
+
+    this.load.audio('collect', 'assets/game-start-6104.mp3');
+    this.load.audio('powerUp', 'assets/game-start-6104.mp3');
+    this.load.audio('diamondSound', 'assets/game-start-6104.mp3');
+    this.load.audio('shadowaSound', 'assets/game-start-6104.mp3'); // Shadowa's attack sound
+    this.load.audio('victorySound', 'assets/game-start-6104.mp3'); // Victory sound
+}
+
+function create() {
+    background = this.add.tileSprite(500, 500, 1400, 1400, 'background1');
+
+    player = this.physics.add.sprite(50, 100, 'player');
+    player.setCollideWorldBounds(true);
+    player.setScale(0.15);
+
+    cursors = this.input.keyboard.createCursorKeys();
+    
+    createStars.call(this, 10); 
+    createObstacles.call(this, 3);
+    createPowerUps.call(this);
+    createDiamonds.call(this);
+
+    scoreText = this.add.text(16, 16, 'Score: 0', { 
+        fontSize: '32px', 
+        fill: '#ff69b4',  
+        fontFamily: 'Comic Sans MS', 
+        stroke: '#000', 
+        strokeThickness: 4
+    });
+
+    levelText = this.add.text(16, 60, 'Level: 1', { 
+        fontSize: '32px', 
+        fill: '#ff69b4', 
+        fontFamily: 'Comic Sans MS', 
+        stroke: '#000', 
+        strokeThickness: 4 
+    });
+
+    livesText = this.add.text(16, 140, 'Lives: ' + lives, {
+        fontSize: '32px',
+        fill: '#ff69b4',
+        fontFamily: 'Comic Sans MS',
+        stroke: '#000',
+        strokeThickness: 4
+    });
+
+    // Game over text, initially hidden
+    gameOverText = this.add.text(600, 500, 'Game Over!', { 
+        fontSize: '64px', 
+        fill: '#FF0000', 
+        fontFamily: 'Comic Sans MS', 
+        stroke: '#000', 
+        strokeThickness: 6
+    });
+    gameOverText.setOrigin(0.5);
+    gameOverText.setVisible(false); // Initially hidden
+
+    timerText = this.add.text(16, 180, 'Time Left: ' + levelTime, { 
+        fontSize: '32px', 
+        fill: '#ff69b4', 
+        fontFamily: 'Comic Sans MS', 
+        stroke: '#000', 
+        strokeThickness: 4 
+    });
+
+    collectSound = this.sound.add('collect');
+    diamondSound = this.sound.add('diamondSound');
+    powerUpSound = this.sound.add('powerUp');
+    shadowaSound = this.sound.add('shadowaSound');
+    victorySound = this.sound.add('victorySound');
+
+    timerEvent = this.time.addEvent({ delay: 1000, callback: onTimerTick, callbackScope: this, loop: true });
+
+    document.getElementById('playButton').style.display = 'block';
+}
+
+function startGame() {
+    gameStarted = true;
+    document.getElementById('playButton').style.display = 'none';
+}
+
+document.getElementById('playButton').addEventListener('click', startGame);
+
+function update() {
+    if (!gameStarted) return;
+
+    background.tilePositionX += 1;
+
+    if (cursors.left.isDown) {
+        player.setVelocityX(-200);
+    } else if (cursors.right.isDown) {
+        player.setVelocityX(200);
+    } else {
+        player.setVelocityX(0);
+    }
+
+    if (cursors.up.isDown) {
+        player.setVelocityY(-200);
+    } else if (cursors.down.isDown) {
+        player.setVelocityY(200);
+    } else {
+        player.setVelocityY(0);
+    }
+
+    if (timeLeft <= 0) {
+        loseLife.call(this);
+    }
+
+    if (finalStage && shadowa && !shadowaDefeated) {
+        shadowaAttack.call(this);
+    }
+}
+
+function onTimerTick() {
+    if (!gameStarted) return;
+    levelTime--;
+    timerText.setText('Time Left: ' + levelTime);
+
+    if (levelTime <= 0) {
+        loseLife.call(this);
+    }
+}
+
+function loseLife() {
+    lives--;
+    livesText.setText('Lives: ' + lives);
+
+    if (lives <= 0) {
+        gameOverText.setVisible(true); // Show Game Over message
+        this.physics.pause();
+    } else {
+        restartLevel.call(this);
+    }
+}
+
+function restartLevel() {
+    player.setPosition(50, 100);
+    levelTime = 30;
+    timerText.setText('Time Left: ' + levelTime);
+}
+
+function createStars(numberOfStars) {
+    stars = this.physics.add.group({
+        key: 'star',
+        repeat: numberOfStars - 1,
+        setXY: { x: 5, y: 10, stepX: 50 }
+    });
+
+    stars.children.iterate(function (child) {
+        child.setBounce(1);
+        child.setCollideWorldBounds(true);
+        child.setScale(0.1);
+        child.setVelocityX(Phaser.Math.Between(-100, 100));
+    });
+
+    this.physics.add.overlap(player, stars, collectStar, null, this);
+}
+
+function collectStar(player, star) {
+    star.disableBody(true, true);
+    score += 10;
+    scoreText.setText('Score: ' + score);
+    collectSound.play();
+
+    if (stars.countActive(true) === 0) {
+        levelUp.call(this);
+    }
+}
+
+function levelUp() {
+    level += 1;
+    levelText.setText('Level: ' + level);
+    levelTime = 30;
+    timerText.setText('Time Left: ' + levelTime);
+
+    lives++;
+    livesText.setText('Lives: ' + lives);
+
+    if (level === backgrounds.length) {
+        finalStage = true;
+        startFinalStage.call(this);
+    } else {
+        restartLevel.call(this);
+        background.setTexture(backgrounds[level - 1]);
+        createStars.call(this, 10 + (level * 5));
+        createObstacles.call(this, 3 + level);
+        createDiamonds.call(this);
+    }
+}
+
+function createObstacles(numObstacles) {
+    obstacles = this.physics.add.group({
+        key: 'barbieBomb',
+        repeat: numObstacles - 1,
+        setXY: { x: 600, y: 150, stepX: 150 }
+    });
+
+    obstacles.children.iterate(function (child) {
+        child.setCollideWorldBounds(true);
+        child.setBounce(1);
+        child.setScale(0.12);
+        child.setVelocity(Phaser.Math.Between(-200, 200), Phaser.Math.Between(-200, 200));
+    });
+
+    this.physics.add.collider(player, obstacles, loseLife, null, this);
+}
+
+// Create power-ups (hearts)
+function createPowerUps() {
+    powerUps = this.physics.add.group({
+        key: 'heart',
+        repeat: 1,
+        setXY: { x: 300, y: 150, stepX: 300 }
+    });
+
+    powerUps.children.iterate(function (child) {
+        child.setCollideWorldBounds(true);
+        child.setBounce(1);
+        child.setScale(0.1);
+        child.setVelocityX(Phaser.Math.Between(-50, 50));
+        child.setVelocityY(Phaser.Math.Between(-50, 50));
+    });
+
+    this.physics.add.overlap(player, powerUps, collectPowerUp, null, this);
+}
+
+function createDiamonds() {
+    diamonds = this.physics.add.group({
+        key: 'diamond',
+        repeat: 3,
+        setXY: { x: 100, y: 200, stepX: 250 }
+    });
+
+    diamonds.children.iterate(function (child) {
+        child.setCollideWorldBounds(true);
+        child.setBounce(1);
+        child.setScale(0.15);
+        child.setVelocityX(Phaser.Math.Between(-50, 50));
+        child.setVelocityY(Phaser.Math.Between(-50, 50));
+    });
+
+    this.physics.add.overlap(player, diamonds, collectDiamond, null, this);
+}
+
+function collectPowerUp(player, powerUp) {
+    powerUp.disableBody(true, true);
+    powerUpSound.play();
+    player.setTint(0x00ff00);
+    isInvincible = true;
+
+    setTimeout(() => {
+        player.clearTint();
+        isInvincible = false;
+    }, 5000);
+}
+
+function collectDiamond(player, diamond) {
+    diamond.disableBody(true, true);
+    score += 50;
+    scoreText.setText('Score: ' + score);
+    diamondSound.play();
+
+    player.setTint(0xffff00);
+    player.setVelocityX(player.body.velocity.x * 1.5);
+    player.setVelocityY(player.body.velocity.y * 1.5);
+    
+    this.time.delayedCall(5000, () => {
+        player.clearTint();
+        player.setVelocityX(player.body.velocity.x / 1.5);
+        player.setVelocityY(player.body.velocity.y / 1.5);
+    });
+}
+
+// Final Stage Logic
+function startFinalStage() {
+    background.setTexture('finalStage');
+    
+    shadowa = this.physics.add.sprite(1000, 400, 'shadowa');
+    shadowa.setCollideWorldBounds(true);
+    shadowa.setScale(0.2);
+    shadowaSound.play();
+
+    shadowaAttack.call(this); // Ensure the context is bound correctly
+}
+
+function shadowaAttack() {
+    // Shadowa's attack logic (sending obstacles toward Barbie)
+    if (finalStage && !shadowaDefeated) {
+        var bomb = this.physics.add.sprite(Phaser.Math.Between(900, 1100), Phaser.Math.Between(100, 800), 'barbieBomb');
+        bomb.setVelocity(Phaser.Math.Between(-300, -500), Phaser.Math.Between(-50, 50));
+        bomb.setScale(0.15);
+        bomb.setCollideWorldBounds(true);
+        this.physics.add.collider(player, bomb, hitByShadowa, null, this);
+    }
+}
+
+function hitByShadowa() {
+    if (!isInvincible) {
+        this.physics.pause();
+        shadowaDefeated = true;
+        shadowa.setVisible(false);
+        victoryScene.call(this);
+    }
+}
+
+function victoryScene() {
+    victorySound.play();
+    
+    // Show Prince of Starlight for victory hug
+    prince = this.physics.add.sprite(600, 400, 'prince');
+    prince.setScale(0.2);
+    prince.setVisible(true);
+    
+    winText = this.add.text(400, 300, 'You Won! The Kingdom is Saved!', {
+        fontSize: '64px',
+        fill: '#FFD700',
+        fontFamily: 'Comic Sans MS',
+        stroke: '#000',
+        strokeThickness: 6
+    });
+    winText.setOrigin(0.5);
+    winText.setVisible(true);
+}
+
+</script>
+
+</body>
+</html>
